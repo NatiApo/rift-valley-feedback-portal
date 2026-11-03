@@ -1,499 +1,361 @@
 
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Activity, BarChart3, CalendarDays, CheckCircle2, Download,
-  FileText, Filter, LogOut, MessageSquare, RefreshCw,
-  Search, ShieldCheck, Star, Users, X
-} from 'lucide-react';
-import { supabase } from './lib/supabase';
-import './index.css';
+import { useState } from "react";
+import { supabase } from "./lib/supabase";
+import Admin from "./Admin";
 
-const formatDate = (value) => {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString();
-};
+const SERVICE_TAGS = [
+  "የምግብና መጠጥ አገልግሎት",
+  "የክፍሎች አገልግሎት",
+  "የሬስቶራንት አገልግሎት",
+  "የመብሰቢያ አዳራሽ",
+  "የሰራተኞች አስተናጋጅነት",
+];
 
-const average = (rows) => rows.length
-  ? (rows.reduce((sum, row) => sum + Number(row.rating || 0), 0) / rows.length).toFixed(1)
-  : '0.0';
+function today() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
 
-function Login({ onLogin }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+function CustomerFeedback() {
+  const [date, setDate] = useState(today());
+  const [room, setRoom] = useState("");
+  const [hall, setHall] = useState("");
+  const [score, setScore] = useState(null);
+  const [comments, setComments] = useState("");
+  const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  async function submit(e) {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  function addTag(tag) {
+    if (!tags.includes(tag)) {
+      setTags((previous) => [...previous, tag]);
+      setComments((previous) =>
+        previous.trim() ? `${previous.trim()}, ${tag}: ` : `${tag}: `
+      );
+    }
+  }
 
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password
-    });
+  async function submitFeedback(event) {
+    event.preventDefault();
+    setError("");
 
-    if (loginError) {
-      setError(loginError.message);
-      setLoading(false);
+    if (score === null) {
+      setError("እባክዎን ከ 0 እስከ 10 ያለውን ነጥብ ይምረጡ።");
       return;
     }
 
-    await onLogin(data.user);
+    setLoading(true);
+
+    const { error: submitError } = await supabase
+      .from("customer_feedback")
+      .insert([
+        {
+          feedback_date: date,
+          room_number: room.trim() || null,
+          meeting_hall: hall.trim() || null,
+          rating: score,
+          comments: comments.trim(),
+          service_tags: tags,
+          source_location: "Customer web form",
+          is_anonymous: false,
+        },
+      ]);
+
     setLoading(false);
+
+    if (submitError) {
+      console.error("Feedback submission error:", submitError);
+      setError("አስተያየትዎን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።");
+      return;
+    }
+
+    setSuccess(true);
   }
 
+  function resetForm() {
+    setDate(today());
+    setRoom("");
+    setHall("");
+    setScore(null);
+    setComments("");
+    setTags([]);
+    setError("");
+    setSuccess(false);
+  }
+
+  const ratingMessage =
+    score === null
+      ? ""
+      : score <= 5
+        ? "ስለተፈጠረው ክፍተት እናዝናለን። እባክዎን ጉድለታችንን ከታች ይግለጹልን።"
+        : score <= 7
+          ? "እናመሰግናለን! የበለጠ ለማሻሻል ምን እንድናደርግ ይመክሩናል?"
+          : "በአገልግሎታችን ደስተኛ ስለሆኑ በጣም እናመሰግናለን!";
+
   return (
-    <main className="login-page">
-      <section className="login-card">
-        <div className="brand-mark">RV</div>
-        <p className="eyebrow">RIFT VALLEY HOTEL • ADAMA</p>
-        <h1>Feedback Intelligence</h1>
-        <p className="muted">Management portal — authorized staff only</p>
+    <main className="feedback-page">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
 
-        <form onSubmit={submit} className="login-form">
-          <label>Email address</label>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="staff@riftvalleyhotel.com"
-            required
-          />
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        .feedback-page {
+          min-height: 100vh;
+          padding: 32px 16px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          background: linear-gradient(135deg,#0f172a,#1e293b);
+          font-family: 'Noto Sans Ethiopic','Poppins',sans-serif;
+          color: #1e293b;
+        }
+        .feedback-card {
+          width: 100%;
+          max-width: 850px;
+          overflow: hidden;
+          background: #fff;
+          border-radius: 18px;
+          box-shadow: 0 25px 60px rgba(0,0,0,.3);
+        }
+        .feedback-header {
+          background: #0f172a;
+          color: white;
+          text-align: center;
+          padding: 30px 20px;
+          border-bottom: 5px solid #c59d33;
+        }
+        .rv-logo {
+          width: 64px; height: 64px; margin: auto auto 12px;
+          border: 1px solid #c59d33; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          color: #c59d33; font-size: 23px; font-weight: 800;
+          background: rgba(197,157,51,.15);
+        }
+        .feedback-header h1 { color: #d4ad50; margin: 0 0 5px; font-size: 27px; }
+        .feedback-header h2 { font-size: 19px; margin: 12px 0 0; }
+        .feedback-header p { color: #94a3b8; font-size: 12px; margin: 0; letter-spacing: 2px; }
+        .feedback-content { padding: 28px; }
+        .intro {
+          background: #fbf8ed; border-left: 4px solid #c59d33;
+          border-radius: 5px; padding: 16px; line-height: 1.9;
+          font-size: 14px; margin-bottom: 25px;
+        }
+        .metadata {
+          display: grid; grid-template-columns: repeat(3,1fr);
+          gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0;
+          border-radius: 12px; padding: 16px; margin-bottom: 28px;
+        }
+        .field label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 7px; color: #475569; }
+        .field input, .feedback-textarea {
+          width: 100%; border: 1px solid #cbd5e1; border-radius: 8px;
+          padding: 11px; font: inherit; font-size: 13px; background: white;
+        }
+        .field input:focus, .feedback-textarea:focus {
+          outline: 2px solid #c59d33; border-color: #c59d33;
+        }
+        .question { margin: 25px 0; }
+        .question-title { font-size: 17px; font-weight: 800; line-height: 1.8; }
+        .muted { color: #64748b; font-size: 12px; }
+        .legend {
+          display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
+          background: #f1f5f9; padding: 13px; border-radius: 8px;
+          font-size: 12px; margin: 14px 0;
+        }
+        .rating-grid { display: grid; grid-template-columns: repeat(11,1fr); gap: 7px; }
+        .rating {
+          border: 1px solid; border-radius: 8px; padding: 13px 2px;
+          font-weight: 800; cursor: pointer; transition: .2s;
+        }
+        .rating:hover { transform: translateY(-2px); }
+        .rating.low { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+        .rating.mid { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+        .rating.high { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+        .rating.selected { color: white; transform: scale(1.07); box-shadow: 0 5px 12px #0003; }
+        .rating.selected.low { background: #dc2626; }
+        .rating.selected.mid { background: #d97706; }
+        .rating.selected.high { background: #059669; }
+        .rating-message { padding: 13px; border-radius: 8px; text-align: center; font-size: 13px; margin-top: 15px; }
+        .rating-message.low { background: #fee2e2; color: #991b1b; }
+        .rating-message.mid { background: #fef3c7; color: #92400e; }
+        .rating-message.high { background: #d1fae5; color: #065f46; }
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+        .tag-button {
+          border: 1px solid #cbd5e1; border-radius: 30px; padding: 7px 12px;
+          background: #f1f5f9; font: inherit; font-size: 11px; cursor: pointer;
+        }
+        .tag-button:hover { background: #fbf1d2; }
+        .feedback-textarea { resize: vertical; min-height: 110px; }
+        .submit-button {
+          width: 100%; border: 0; border-radius: 10px; padding: 15px;
+          background: #b8860b; color: white; font: inherit;
+          font-weight: 800; cursor: pointer; font-size: 15px;
+        }
+        .submit-button:hover { background: #966607; }
+        .submit-button:disabled { opacity: .6; cursor: wait; }
+        .feedback-footer {
+          background: #f1f5f9; padding: 13px 22px; text-align: right;
+          color: #64748b; font-size: 11px; border-top: 1px solid #e2e8f0;
+        }
+        .error-message { color: #b91c1c; background: #fee2e2; padding: 12px; border-radius: 8px; font-size: 13px; margin: 12px 0; }
+        .modal-backdrop {
+          position: fixed; inset: 0; background: #0f172add;
+          display: flex; align-items: center; justify-content: center;
+          padding: 16px; z-index: 10;
+        }
+        .success-modal {
+          background: white; width: 100%; max-width: 430px;
+          padding: 28px; border-radius: 16px; text-align: center;
+          box-shadow: 0 20px 50px #0005;
+        }
+        .success-icon { font-size: 48px; color: #059669; }
+        .summary { background: #f8fafc; padding: 14px; border-radius: 8px; text-align: left; font-size: 12px; line-height: 2; margin: 18px 0; }
+        .modal-button { width: 100%; background: #0f172a; color: white; border: 0; padding: 12px; border-radius: 8px; font: inherit; cursor: pointer; }
+        @media(max-width:650px) {
+          .metadata { grid-template-columns: 1fr; }
+          .legend { grid-template-columns: 1fr; }
+          .feedback-content { padding: 18px; }
+          .rating-grid { gap: 3px; }
+          .rating { padding: 11px 0; font-size: 12px; }
+          .feedback-header h1 { font-size: 23px; }
+          .question-title { font-size: 15px; }
+        }
+      `}</style>
 
-          <label>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            required
-          />
+      <div className="feedback-card">
+        <header className="feedback-header">
+          <div className="rv-logo">RV</div>
+          <h1>ሪፍት ቫሊ ሆቴል</h1>
+          <p>RIFT VALLEY HOTEL • ADAMA</p>
+          <div style={{ width: 64, height: 2, background: "#c59d33", margin: "15px auto" }} />
+          <h2>የደንበኞች አስተያየት ዳሰሳ ጥናት</h2>
+        </header>
 
-          {error && <div className="error-message">{error}</div>}
+        <div className="feedback-content">
+          <div className="intro">
+            እኛን ስለመረጡን እናመሰግናለን! አገልግሎታችንን ለማሻሻል ዘወትር እንጣጣራለን፤ እንዲሁም የእርስዎን ታማኝ አስተያየት ከፍ አድርገን እንመለከታለን። ይህ አጭር ዳሰሳ ጥናት ከአንድ ደቂቃ ያነሰ ጊዜ ይወስዳል።
+          </div>
 
-          <button className="primary-button" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in securely'}
-          </button>
-        </form>
+          <form onSubmit={submitFeedback}>
+            <div className="metadata">
+              <div className="field">
+                <label>ቀን (Date)</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label>የክፍል ቁጥር (Room No)</label>
+                <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="ምሳሌ: 204" />
+              </div>
+              <div className="field">
+                <label>የመብሰቢያ አዳራሽ (Meeting Hall)</label>
+                <input value={hall} onChange={(e) => setHall(e.target.value)} placeholder="ምሳሌ: አዳራሽ A" />
+              </div>
+            </div>
 
-        <div className="secure-note">
-          <ShieldCheck size={17} />
-          Protected management access
+            <section className="question">
+              <div className="question-title">
+                1. ከ 0 እስከ 10 ባለው ልኬት መሠረት፤ ሪፍት ቫሊ ሆቴልን (Rift Valley Hotel) ለጓደኛዎ፣ ለቤተሰብዎ አባል ወይም ለሥራ ባልደረባዎ በአገልግሎታችን እንዲጠቀሙ ሆቴላችንን የመጠቀም ፍላጎትዎ ምን ያህል ነው?
+              </div>
+              <p className="muted">(በምርጫዎ ቁጥር ላይ ጠቅ ያድርጉ)</p>
+
+              <div className="legend">
+                <div>🔴 <strong>0–5:</strong> አገልግሎቱ ደካማ ነው</div>
+                <div>🟠 <strong>6–7:</strong> መካከለኛ አገልግሎት</div>
+                <div>🟢 <strong>8–10:</strong> ጥሩ አገልግሎት</div>
+              </div>
+
+              <div className="rating-grid">
+                {Array.from({ length: 11 }, (_, i) => {
+                  const type = i <= 5 ? "low" : i <= 7 ? "mid" : "high";
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`rating ${type} ${score === i ? "selected" : ""}`}
+                      onClick={() => setScore(i)}
+                    >
+                      {i}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {score !== null && (
+                <div className={`rating-message ${score <= 5 ? "low" : score <= 7 ? "mid" : "high"}`}>
+                  {ratingMessage}
+                </div>
+              )}
+            </section>
+
+            <section className="question">
+              <div className="question-title">2. ዋናው ምክንያት</div>
+              <p style={{ fontSize: 13, lineHeight: 1.9, color: "#475569" }}>
+                ከላይ ለሰጡትን ምላሽ ዋናው ምክንያት ምንድን ነው? (የምግብና መጠጥ አገልግሎት፣ የክፍሎች አገልግሎት፣ የሬስቶራንት አገልግሎት ወይም ሌላ...?) በጥሩ ሁኔታ የሰራነውን ወይም ልናሻሽለው የሚገባውን ነገር በነፃነት ይግለጹልን።
+              </p>
+
+              <div className="tag-list">
+                {SERVICE_TAGS.map((tag) => (
+                  <button className="tag-button" type="button" key={tag} onClick={() => addTag(tag)}>
+                    + {tag}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                className="feedback-textarea"
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="አስተያየትዎን እዚህ ይጻፉ..."
+                required
+              />
+            </section>
+
+            {error && <div className="error-message">{error}</div>}
+
+            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 20, marginTop: 25 }}>
+              <p style={{ textAlign: "center", fontWeight: 700, fontStyle: "italic", fontSize: 13, marginBottom: 18 }}>
+                ዋጋ ያለው ጊዜዎን ሰውተው ስለሰጡን አስተያየት በቅድሚያ እናመሰግናለን!
+              </p>
+              <button className="submit-button" type="submit" disabled={loading}>
+                {loading ? "በመላክ ላይ..." : "✉ አስተያየትዎን ላክ (Submit Feedback)"}
+              </button>
+            </div>
+          </form>
         </div>
-      </section>
+
+        <footer className="feedback-footer">
+          Approved by: <strong style={{ color: "#334155" }}>Rift Valley Hotel Management</strong>
+        </footer>
+      </div>
+
+      {success && (
+        <div className="modal-backdrop">
+          <div className="success-modal">
+            <div className="success-icon">✓</div>
+            <h2>እናመሰግናለን!</h2>
+            <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.8 }}>
+              አስተያየትዎ በተሳካ ሁኔታ ተልኳል። አገልግሎታችንን ለማሻሻል የምንጠቀመበት ይሆናል።
+            </p>
+            <div className="summary">
+              <div><strong>የተሰጠ ነጥብ:</strong> {score} / 10</div>
+              <div><strong>ቀን:</strong> {date}</div>
+              <div><strong>ክፍል/አዳራሽ:</strong> {room || hall ? `${room ? `ክፍል ${room}` : ""}${room && hall ? " / " : ""}${hall}` : "ግልጽ ያልሆነ"}</div>
+            </div>
+            <button className="modal-button" onClick={resetForm}>እሺ (OK)</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [feedback, setFeedback] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [ratingFilter, setRatingFilter] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selected, setSelected] = useState(null);
+export default function App() {
+  const path = window.location.pathname;
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function initialize() {
-      const { data } = await supabase.auth.getSession();
-      if (mounted && data.session?.user) {
-        await loadProfile(data.session.user);
-      } else if (mounted) {
-        setLoading(false);
-      }
-    }
-
-    initialize();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        if (session?.user) {
-          await loadProfile(session.user);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setFeedback([]);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => {
-      mounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  async function loadProfile(authUser) {
-    setLoading(true);
-    setError('');
-
-    const { data: staff, error: profileError } = await supabase
-      .from('staff_profiles')
-      .select('user_id, full_name, role, is_active')
-      .eq('user_id', authUser.id)
-      .maybeSingle();
-
-    if (profileError || !staff || !staff.is_active) {
-      await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
-      setError('This account is not authorized to access the management portal.');
-      setLoading(false);
-      return;
-    }
-
-    setUser(authUser);
-    setProfile(staff);
-    await loadFeedback();
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    return <Admin />;
   }
 
-  async function loadFeedback() {
-    setError('');
-    const { data, error: fetchError } = await supabase
-      .from('customer_feedback')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
-      setFeedback(data || []);
-    }
-    setLoading(false);
-  }
-
-  async function logout() {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setFeedback([]);
-  }
-
-  const filtered = useMemo(() => {
-    return feedback.filter(row => {
-      const text = [
-        row.room_number,
-        row.meeting_hall,
-        row.comments,
-        row.source_location,
-        ...(row.service_tags || [])
-      ].join(' ').toLowerCase();
-
-      const matchesSearch = text.includes(search.toLowerCase());
-      const matchesRating = ratingFilter === 'all' ||
-        (ratingFilter === 'high' && row.rating >= 8) ||
-        (ratingFilter === 'medium' && row.rating >= 6 && row.rating <= 7) ||
-        (ratingFilter === 'low' && row.rating <= 5);
-
-      const day = row.feedback_date || row.created_at?.slice(0, 10);
-      const matchesStart = !startDate || day >= startDate;
-      const matchesEnd = !endDate || day <= endDate;
-
-      return matchesSearch && matchesRating && matchesStart && matchesEnd;
-    });
-  }, [feedback, search, ratingFilter, startDate, endDate]);
-
-  const scoreAverage = average(filtered);
-  const promoters = filtered.filter(r => r.rating >= 8).length;
-  const satisfaction = filtered.length
-    ? Math.round((promoters / filtered.length) * 100)
-    : 0;
-
-  const ratingCounts = Array.from({ length: 11 }, (_, rating) => ({
-    rating,
-    count: filtered.filter(row => Number(row.rating) === rating).length
-  }));
-
-  function exportCSV() {
-    const headers = [
-      'Date', 'Room Number', 'Meeting Hall', 'Rating',
-      'Comments', 'Service Tags', 'Source'
-    ];
-
-    const rows = filtered.map(row => [
-      row.feedback_date || row.created_at,
-      row.room_number,
-      row.meeting_hall,
-      row.rating,
-      row.comments,
-      (row.service_tags || []).join('; '),
-      row.source_location
-    ]);
-
-    const csv = [headers, ...rows]
-      .map(row => row.map(value =>
-        `"${String(value ?? '').replaceAll('"', '""')}"`
-      ).join(','))
-      .join('\r\n');
-
-    const blob = new Blob(['\uFEFF' + csv], {
-      type: 'text/csv;charset=utf-8;'
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Rift-Valley-Feedback-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  if (loading) {
-    return <div className="loading-screen"><RefreshCw className="spin" /> Loading portal...</div>;
-  }
-
-  if (!user || !profile) {
-    return <Login onLogin={loadProfile} />;
-  }
-
-  return (
-    <div className="dashboard">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-mark small">RV</div>
-          <div>
-            <strong>RIFT VALLEY</strong>
-            <span>HOTEL • ADAMA</span>
-          </div>
-        </div>
-
-        <div className="nav-label">WORKSPACE</div>
-        <div className="nav-item active"><BarChart3 size={18} /> Overview</div>
-        <div className="nav-item"><MessageSquare size={18} /> Guest feedback</div>
-        <div className="nav-item"><Activity size={18} /> Service insights</div>
-
-        <div className="sidebar-bottom">
-          <div className="staff-box">
-            <div className="staff-avatar">{(profile.full_name || 'S').charAt(0)}</div>
-            <div className="staff-info">
-              <strong>{profile.full_name}</strong>
-              <span>{profile.role}</span>
-            </div>
-          </div>
-          <button className="logout-button" onClick={logout}>
-            <LogOut size={17} /> Sign out
-          </button>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">GUEST EXPERIENCE MANAGEMENT</p>
-            <h1>Feedback dashboard</h1>
-            <p className="muted">Understand guest satisfaction and improve hotel service.</p>
-          </div>
-          <div className="top-actions">
-            <button className="outline-button" onClick={loadFeedback}>
-              <RefreshCw size={16} /> Refresh
-            </button>
-            <button className="primary-button export-button" onClick={exportCSV}>
-              <Download size={17} /> Export CSV
-            </button>
-          </div>
-        </header>
-
-        {error && <div className="error-message">{error}</div>}
-
-        <section className="stats-grid">
-          <Stat icon={<MessageSquare />} label="Total feedback" value={filtered.length} detail="Matching records" />
-          <Stat icon={<Star />} label="Average rating" value={`${scoreAverage}/10`} detail="Out of ten points" />
-          <Stat icon={<CheckCircle2 />} label="Positive ratings" value={`${satisfaction}%`} detail="Ratings of 8–10" />
-          <Stat icon={<Users />} label="All submissions" value={feedback.length} detail="Across all dates" />
-        </section>
-
-        <section className="content-grid">
-          <div className="panel rating-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Rating distribution</h2>
-                <p className="muted">Guest ratings from 0 to 10</p>
-              </div>
-              <BarChart3 size={21} />
-            </div>
-            <div className="rating-chart">
-              {ratingCounts.map(item => (
-                <div className="bar-column" key={item.rating}>
-                  <span className="bar-count">{item.count || ''}</span>
-                  <div className="bar-track">
-                    <div
-                      className={`bar-fill ${item.rating <= 5 ? 'low' : item.rating <= 7 ? 'mid' : 'high'}`}
-                      style={{ height: `${filtered.length ? Math.max(3, item.count / Math.max(...ratingCounts.map(x => x.count), 1) * 100) : 3}%` }}
-                    />
-                  </div>
-                  <span className="bar-label">{item.rating}</span>
-                </div>
-              ))}
-            </div>
-            <div className="chart-legend">
-              <span><i className="dot low" /> 0–5 Needs improvement</span>
-              <span><i className="dot mid" /> 6–7 Fair</span>
-              <span><i className="dot high" /> 8–10 Positive</span>
-            </div>
-          </div>
-
-          <div className="panel insight-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Guest satisfaction</h2>
-                <p className="muted">Ratings of 8 to 10</p>
-              </div>
-              <Activity size={21} />
-            </div>
-            <div className="satisfaction-number">{satisfaction}<small>%</small></div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${satisfaction}%` }} />
-            </div>
-            <p className="muted">
-              {promoters} positive ratings out of {filtered.length} matching submissions.
-            </p>
-            <div className="insight-note">
-              <Star size={18} />
-              <span>Use guest comments and service tags to identify areas for improvement.</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel feedback-panel">
-          <div className="panel-heading records-heading">
-            <div>
-              <h2>Guest feedback records</h2>
-              <p className="muted">Search, filter and review guest submissions.</p>
-            </div>
-            <span className="record-count">{filtered.length} records</span>
-          </div>
-
-          <div className="filters">
-            <div className="search-box">
-              <Search size={17} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search comments, room, service..."
-              />
-              {search && <button onClick={() => setSearch('')}><X size={15} /></button>}
-            </div>
-
-            <select value={ratingFilter} onChange={e => setRatingFilter(e.target.value)}>
-              <option value="all">All ratings</option>
-              <option value="high">Positive (8–10)</option>
-              <option value="medium">Fair (6–7)</option>
-              <option value="low">Needs improvement (0–5)</option>
-            </select>
-
-            <label className="date-filter">
-              <CalendarDays size={16} />
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-            </label>
-            <label className="date-filter">
-              <CalendarDays size={16} />
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-            </label>
-            <button className="clear-button" onClick={() => {
-              setSearch('');
-              setRatingFilter('all');
-              setStartDate('');
-              setEndDate('');
-            }}>
-              <Filter size={15} /> Clear
-            </button>
-          </div>
-
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Room</th>
-                  <th>Meeting hall</th>
-                  <th>Rating</th>
-                  <th>Comments</th>
-                  <th>Service tags</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(row => (
-                  <tr key={row.id}>
-                    <td>{formatDate(row.feedback_date || row.created_at)}</td>
-                    <td>{row.room_number || '—'}</td>
-                    <td>{row.meeting_hall || '—'}</td>
-                    <td>
-                      <span className={`rating-pill ${row.rating >= 8 ? 'good' : row.rating >= 6 ? 'fair' : 'poor'}`}>
-                        <Star size={13} /> {row.rating}/10
-                      </span>
-                    </td>
-                    <td className="comment-cell">{row.comments || '—'}</td>
-                    <td>{(row.service_tags || []).join(', ') || '—'}</td>
-                    <td><button className="view-button" onClick={() => setSelected(row)}>View</button></td>
-                  </tr>
-                ))}
-                {!filtered.length && (
-                  <tr><td colSpan="7" className="empty-state">
-                    <FileText size={28} />
-                    <strong>No feedback records found</strong>
-                    <span>Try changing your search or filters.</span>
-                  </td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <footer className="dashboard-footer">
-          <span>Rift Valley Hotel • Adama</span>
-          <span><ShieldCheck size={14} /> Secure management portal</span>
-        </footer>
-      </main>
-
-      {selected && (
-        <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <section className="detail-modal" onClick={e => e.stopPropagation()}>
-            <div className="panel-heading">
-              <div><p className="eyebrow">SUBMISSION DETAILS</p><h2>Guest feedback</h2></div>
-              <button className="close-button" onClick={() => setSelected(null)}><X /></button>
-            </div>
-            <Detail label="Feedback date" value={formatDate(selected.feedback_date || selected.created_at)} />
-            <Detail label="Room number" value={selected.room_number} />
-            <Detail label="Meeting hall" value={selected.meeting_hall} />
-            <Detail label="Rating" value={`${selected.rating}/10`} />
-            <Detail label="Comments" value={selected.comments} />
-            <Detail label="Service tags" value={(selected.service_tags || []).join(', ')} />
-            <Detail label="Source" value={selected.source_location} />
-            <button className="primary-button full-button" onClick={() => setSelected(null)}>Close details</button>
-          </section>
-        </div>
-      )}
-    </div>
-  );
+  return <CustomerFeedback />;
 }
-
-function Stat({ icon, label, value, detail }) {
-  return (
-    <div className="stat-card">
-      <div className="stat-top"><span>{label}</span><span className="stat-icon">{icon}</span></div>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
-  );
-}
-
-function Detail({ label, value }) {
-  return (
-    <div className="detail-row">
-      <span>{label}</span>
-      <strong>{value || '—'}</strong>
-    </div>
-  );
-}
-
-export default App;
