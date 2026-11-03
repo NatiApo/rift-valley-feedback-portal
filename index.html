@@ -1,0 +1,45 @@
+
+<!doctype html>
+<html lang="am">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>የሪፍት ቫሊ ሆቴል | Rift Valley Hotel Feedback</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@300;400;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              gold: {
+                50: '#fbf8ed',
+                100: '#f5eece',
+                300: '#e5ca79',
+                500: '#c59d33',
+                600: '#b8860b',
+                700: '#966607'
+              },
+              navy: {
+                800: '#1a2536',
+                900: '#0f172a'
+              }
+            },
+            fontFamily: {
+              sans: ['Noto Sans Ethiopic', 'Poppins', 'sans-serif']
+            }
+          }
+        }
+      };
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
