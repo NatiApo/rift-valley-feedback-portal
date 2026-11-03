@@ -622,9 +622,9 @@ function Admin() {
                   MANAGEMENT OVERVIEW
                 </span>
 
-                <h2>
-                  Welcome back, {profile.full_name?.split(' ')[0] || 'Manager'}.
-                </h2>
+          <h2>
+  Welcome back.
+</h2>
 
                 <p>
                   Monitor guest experiences and understand hotel service performance.
