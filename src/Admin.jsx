@@ -63,6 +63,15 @@ const getRatingType = (rating) => {
   return 'poor';
 };
 
+const getNpsType = (rating) => {
+  if (rating === null || rating === undefined || rating === '') return 'Unclassified';
+  const score = Number(rating);
+  if (score >= 9 && score <= 10) return 'Promoter';
+  if (score >= 7 && score <= 8) return 'Passive';
+  if (score >= 0 && score <= 6) return 'Detractor';
+  return 'Unclassified';
+};
+
 function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -312,7 +321,10 @@ function Admin() {
         ratingFilter === 'all' ||
         (ratingFilter === 'positive' && row.rating >= 8) ||
         (ratingFilter === 'fair' && row.rating >= 6 && row.rating <= 7) ||
-        (ratingFilter === 'poor' && row.rating <= 5);
+        (ratingFilter === 'poor' && row.rating <= 5) ||
+        (ratingFilter === 'nps-promoters' && getNpsType(row.rating) === 'Promoter') ||
+        (ratingFilter === 'nps-passives' && getNpsType(row.rating) === 'Passive') ||
+        (ratingFilter === 'nps-detractors' && getNpsType(row.rating) === 'Detractor');
 
       const day = row.feedback_date || row.created_at?.slice(0, 10);
 
@@ -335,6 +347,15 @@ function Admin() {
     row => row.rating >= 6 && row.rating <= 7
   ).length;
   const poorRatings = filtered.filter(row => row.rating <= 5).length;
+
+  // Standard NPS groups: detractors 0–6, passives 7–8, promoters 9–10.
+  const npsPromoters = filtered.filter(row => getNpsType(row.rating) === 'Promoter').length;
+  const npsPassives = filtered.filter(row => getNpsType(row.rating) === 'Passive').length;
+  const npsDetractors = filtered.filter(row => getNpsType(row.rating) === 'Detractor').length;
+  const npsResponses = npsPromoters + npsPassives + npsDetractors;
+  const npsScore = npsResponses
+    ? Math.round(((npsPromoters - npsDetractors) / npsResponses) * 100)
+    : null;
 
   const satisfaction = filtered.length
     ? Math.round((promoters / filtered.length) * 100)
@@ -386,6 +407,7 @@ function Admin() {
       'Room Number',
       'Meeting Hall',
       'Rating',
+      'NPS Group',
       'Comments',
       'Service Tags',
       'Source'
@@ -397,6 +419,7 @@ function Admin() {
       row.room_number || '',
       row.meeting_hall || '',
       row.rating,
+      getNpsType(row.rating),
       row.comments || '',
       (row.service_tags || []).join('; '),
       row.source_location || ''
@@ -712,6 +735,14 @@ function Admin() {
                 detail="Across all dates"
                 color="purple"
               />
+
+              <Stat
+                icon={<TrendingUp />}
+                label="Net Promoter Score"
+                value={npsScore === null ? '—' : npsScore > 0 ? `+${npsScore}` : npsScore}
+                detail="Promoters % minus detractors %"
+                color="green"
+              />
             </section>
 
             <section className="rv-section-heading" id="rating-insights">
@@ -838,6 +869,42 @@ function Admin() {
                 </div>
               </div>
 
+              <div className="rv-panel rv-nps-panel">
+                <div className="rv-panel-heading">
+                  <div>
+                    <h3>Net Promoter Score (NPS)</h3>
+                    <p>How likely guests are to recommend the hotel</p>
+                  </div>
+                  <div className="rv-panel-icon">
+                    <TrendingUp size={21} />
+                  </div>
+                </div>
+
+                <div className="rv-nps-value">
+                  {npsScore === null ? '—' : npsScore > 0 ? `+${npsScore}` : npsScore}
+                  <small>/ 100</small>
+                </div>
+                <p className="rv-nps-formula">NPS = % Promoters − % Detractors</p>
+
+                <div className="rv-nps-breakdown">
+                  <div>
+                    <span><i className="rv-nps-dot promoter" />Promoters <small>(9–10)</small></span>
+                    <strong>{npsPromoters}</strong>
+                  </div>
+                  <div>
+                    <span><i className="rv-nps-dot passive" />Passives <small>(7–8)</small></span>
+                    <strong>{npsPassives}</strong>
+                  </div>
+                  <div>
+                    <span><i className="rv-nps-dot detractor" />Detractors <small>(0–6)</small></span>
+                    <strong>{npsDetractors}</strong>
+                  </div>
+                </div>
+                <p className="rv-nps-note">
+                  Based on {npsResponses} valid NPS {npsResponses === 1 ? 'response' : 'responses'} matching the current filters.
+                </p>
+              </div>
+
             </section>
 
             <section className="rv-panel rv-feedback-panel" id="feedback-records">
@@ -890,6 +957,9 @@ function Admin() {
                   <option value="positive">Positive (8–10)</option>
                   <option value="fair">Fair (6–7)</option>
                   <option value="poor">Needs improvement (0–5)</option>
+                  <option value="nps-promoters">NPS Promoters (9–10)</option>
+                  <option value="nps-passives">NPS Passives (7–8)</option>
+                  <option value="nps-detractors">NPS Detractors (0–6)</option>
                 </select>
 
                 <label className="rv-date-filter">
@@ -944,6 +1014,7 @@ function Admin() {
                       <th>ROOM</th>
                       <th>MEETING HALL</th>
                       <th>RATING</th>
+                      <th>NPS GROUP</th>
                       <th>COMMENTS</th>
                       <th>SERVICE TAGS</th>
                       <th>ACTION</th>
@@ -969,6 +1040,12 @@ function Admin() {
                           >
                             <Star size={13} />
                             {row.rating}/10
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className={`rv-nps-badge ${getNpsType(row.rating).toLowerCase()}`}>
+                            {getNpsType(row.rating)}
                           </span>
                         </td>
 
@@ -1000,7 +1077,7 @@ function Admin() {
 
                     {!paginatedFeedback.length && (
                       <tr>
-                        <td colSpan="7">
+                        <td colSpan="8">
                           <div className="rv-empty-state">
                             <div>
                               <FileText size={30} />
@@ -1123,6 +1200,11 @@ function Admin() {
               <Detail
                 label="Meeting hall"
                 value={selected.meeting_hall}
+              />
+
+              <Detail
+                label="NPS group"
+                value={getNpsType(selected.rating)}
               />
 
               <Detail
@@ -1844,7 +1926,7 @@ button:disabled {
 
 .rv-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 15px;
 }
 
@@ -1921,9 +2003,93 @@ button:disabled {
 
 .rv-insights-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr;
   gap: 16px;
 }
+
+.rv-nps-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.rv-nps-value {
+  color: var(--rv-navy);
+  font-family: 'Poppins', sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  margin: 20px 0 0;
+  line-height: 1.1;
+}
+
+.rv-nps-value small {
+  color: var(--rv-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 5px;
+}
+
+.rv-nps-formula,
+.rv-nps-note {
+  color: var(--rv-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.rv-nps-breakdown {
+  display: grid;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.rv-nps-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.rv-nps-breakdown > div > span {
+  display: flex;
+  align-items: center;
+  color: #536176;
+}
+
+.rv-nps-breakdown small {
+  color: var(--rv-muted);
+  margin-left: 4px;
+}
+
+.rv-nps-breakdown strong {
+  color: var(--rv-navy);
+  font-size: 13px;
+}
+
+.rv-nps-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.rv-nps-dot.promoter { background: #16865b; }
+.rv-nps-dot.passive { background: #d6a943; }
+.rv-nps-dot.detractor { background: #c94c4c; }
+
+.rv-nps-badge {
+  display: inline-flex;
+  border-radius: 20px;
+  padding: 5px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rv-nps-badge.promoter { background: #e7f6ee; color: #16865b; }
+.rv-nps-badge.passive { background: #fff5dc; color: #9a741b; }
+.rv-nps-badge.detractor { background: #fff0ee; color: #b74444; }
+.rv-nps-badge.unclassified { background: #eef1f5; color: #657184; }
 
 .rv-panel {
   background: white;
