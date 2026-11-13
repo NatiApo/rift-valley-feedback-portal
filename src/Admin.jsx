@@ -64,6 +64,7 @@ const getRatingType = (rating) => {
 };
 
 const getNpsType = (rating) => {
+  if (rating === null || rating === undefined || rating === '') return 'Unclassified';
   const score = Number(rating);
   if (score >= 9 && score <= 10) return 'Promoter';
   if (score >= 7 && score <= 8) return 'Passive';
@@ -351,8 +352,9 @@ function Admin() {
   const npsPromoters = filtered.filter(row => getNpsType(row.rating) === 'Promoter').length;
   const npsPassives = filtered.filter(row => getNpsType(row.rating) === 'Passive').length;
   const npsDetractors = filtered.filter(row => getNpsType(row.rating) === 'Detractor').length;
-  const npsScore = filtered.length
-    ? Math.round(((npsPromoters - npsDetractors) / filtered.length) * 100)
+  const npsResponses = npsPromoters + npsPassives + npsDetractors;
+  const npsScore = npsResponses
+    ? Math.round(((npsPromoters - npsDetractors) / npsResponses) * 100)
     : null;
 
   const satisfaction = filtered.length
@@ -899,7 +901,7 @@ function Admin() {
                   </div>
                 </div>
                 <p className="rv-nps-note">
-                  Based on {filtered.length} feedback {filtered.length === 1 ? 'response' : 'responses'} matching the current filters.
+                  Based on {npsResponses} valid NPS {npsResponses === 1 ? 'response' : 'responses'} matching the current filters.
                 </p>
               </div>
 
